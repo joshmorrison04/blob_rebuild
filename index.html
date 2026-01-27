@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, viewport-fit=cover">
+    <title>audio-blob</title>
+    <style>
+      body { margin : 0; }
+
+      #ui {
+        position: fixed;
+        bottom: 30px; 
+        left: 50%; 
+        transform: translateX(-50%);
+        z-index: 10;
+      }
+
+      @media (max-width: 600px) {
+        #ui {
+          bottom: 30px;
+          left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+
+      #userText {
+        width: min(90vw, 420px);
+        max-width: 100%;
+        padding: 14px 16px; 
+        font-size: 16px; 
+        border-radius: 10px;
+        background: #ffffff; 
+        color: #000000; 
+        caret-color: #000000; 
+      }
+
+      @media (max-width: 768px) {
+        #userText {
+          font-size: 16px;
+          padding: 12px 14px;
+        }
+      }
+
+    </style> 
+  </head>
+  <body>
+    
+    <!-- User Text Box -->
+     <div id="ui">
+      <textarea 
+      id = "userText" 
+      rows="2" 
+      placeholder="Type something to see the blob react!"
+      autocomplete="off"></textarea>
+    </div> 
+
+
+    <!--Placing GLSL code in Index.html because it is a resource that willm be called
+    Index.html consists of resources and assets
+    Main.js consits of logic and wiring-->
+
+    <!-- Vertex Shader: Runs for each point(vertex) of a 3D model,
+    Runs once per vertex 
+    determines the shape and movement of the object -->
+    <script id="vertexshader" type="vertex">
+      // Adding u_time variable as a float coming from javascript
+      // uniform: Means this value is coming from JavaScript
+      // float: it's going to be a decimal
+      // u_time: the variable name which matches my JS uniform name
+
+
+      // Add a varying for the normal
+      varying vec3 vNormal; 
+
+      uniform float u_time;
+      uniform float u_speed;
+      uniform float u_amplitude;
+
+      // Send a value from vertexshader to fragmentshader to createa a color gradient
+      // varting is a value the vertex shader outputs and the fragment
+      // shader recieves
+      varying float vNoise; 
+
+      float hash(vec3 p) {
+        return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+      }
+      
+      // Takes a 3D coordinate, returns a value roughly between 0 and 1
+      // The 3D coordinate it takes is from our float n noise line. 
+      float noise(vec3 p) {
+        vec3 i = floor(p);
+        vec3 f = fract(p);
+      
+        float a = hash(i);
+        float b = hash(i + vec3(1.0, 0.0, 0.0));
+        float c = hash(i + vec3(0.0, 1.0, 0.0));
+        float d = hash(i + vec3(1.0, 1.0, 0.0));
+      
+        vec2 u = f.xy * f.xy * (3.0 - 2.0 * f.xy);
+      
+        return mix(a, b, u.x) +
+               (c - a) * u.y * (1.0 - u.x) +
+               (d - b) * u.x * u.y;
+      }
+      
+
+      void main() {
+        // 3d vector variable named p, assigned to position, 
+        // a built in attribute provided per vertex
+        // Essentially copy the vertex's original position into a variable
+
+        vec3 p = position;
+
+        // add varying for the normal
+        vNormal = normalize(normalMatrix * normal); 
+
+        // Create a value that smoothly goes up and down over time 
+        // range + pulse intensity * sin(u_time);
+        // range + pulse * sin(u_time + length(position)); 
+        // length() returns the distance of the vector from the origin 
+        // length(position): offsets the sine wave per vertex so vertices
+        // animate out of sync with each other
+        // float pulse = 1.0 + 0.05 * sin(u_time);
+
+        // Change pulse to sample noise using position and time
+        // noise() retunrs a smooth value per vertex
+        // n is a determinstic value that is computed every frame 
+        // position * 1.5 controls the scale of the noise, makes it crazy or calm (amplitude)
+        // u_time * 0.5 moves through noise over time, alters speed
+        float n = noise(position * u_speed + vec3(u_time * u_amplitude));
+        vNoise = n; 
+
+        // map noise to a displacement amount
+        // turs noise into a positive/negative offset
+        // controls how strong the movement is 
+        float displacement = (n - 0.5) * 0.6; 
+
+        // push vertex outward, by an amount which is noise-driven
+        // normalize(position) changes position's x value to 1,
+        // essentially changing distance to the right from whatev it was to 1
+        // Makes it so that when you calculate displacement its constant 
+        // and not a super high val that makes the vertices stretch and look weird. 
+        p += normalize(position) * displacement; 
+
+        // Scale the vertex position by multiplying it by pulse
+        // To scale the vertex position outward/inward so the shape grows and shrinks
+
+        // float wobble = 0.25 * sin(u_time + position.x * 2.0 + position.y * 2.0 + position.z * 2.0);
+        // p += normalize(position) * wobble;  
+
+        // Vertex Shader Line: Take the vertex’s 3D position and convert it into the correct screen-space position.
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }
+    </script>
+    
+     <!-- Fragent Shader: Runs once per pixel, determines color -->
+    <script id="fragmentshader" type="fragment">
+      // Adding uniform red green and blue values
+      uniform float u_r; 
+      uniform float u_g; 
+      uniform float u_b; 
+
+      // Adding varying here, will recieve value from varying in fragment shader
+      varying float vNoise;
+
+      // Use vNormal in fragment shader: 
+      varying vec3 vNormal; 
+
+      void main() {
+        // Final pixel color: 
+        // vec4(1.0) means RGBA all set to 1.0 which makes white
+        // gl_FragColor = vec4(1.0); 
+
+        // Giving actual colors to fragment shader now: 
+        // vec3 colorA = vec3(0.05, 0.1, 0.35); // deep blue
+        // vec3 colorB = vec3(0.3, 0.9, 0.8); // teal
+
+        // Mix color A and B by vNoise blending amount 
+        // vec3 finalColor = mix(colorA, colorB, vNoise); 
+
+        // Uniform basecolor: 
+        vec3 baseColor = vec3(u_r, u_g, u_b);
+
+        // Rim Lighting
+        float rim = 1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))); 
+        rim = pow(rim, 2.0); 
+
+        vec3 finalColor = baseColor + rim * 0.4;
+
+        // (finalColor, opacity)
+        gl_FragColor = vec4(finalColor, 1.0); 
+      }
+    </script>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
