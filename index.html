@@ -41,6 +41,38 @@
         }
       }
 
+      #signature {
+        position: fixed;
+        left: 16px;
+        bottom: 12px;
+        z-index: 5;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      #signature img {
+        display: block;
+        width: min(28vw, 140px);
+        height: auto;
+        opacity: 0.7;
+        background: rgba(255, 255, 255, 0.75);
+        padding: 6px 8px;
+        border-radius: 6px;
+        filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.35));
+      }
+
+      @media (max-width: 600px) {
+        #signature {
+          left: 12px;
+          bottom: 10px;
+        }
+
+        #signature img {
+          width: min(34vw, 120px);
+          opacity: 0.75;
+        }
+      }
+
     </style> 
   </head>
   <body>
@@ -53,6 +85,10 @@
       placeholder="Type how you feel emotionally and see the blob react!"
       autocomplete="off"></textarea>
     </div> 
+
+    <div id="signature">
+      <img src="/JM_Signature.png" alt="JM Signature">
+    </div>
 
 
     <!--Placing GLSL code in Index.html because it is a resource that willm be called
